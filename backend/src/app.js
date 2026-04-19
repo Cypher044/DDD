@@ -5,12 +5,15 @@ import authRoutes from "./routes/authRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import { createTransitRouter } from "./routes/transitRoutes.js";
 
-export function createApp(io, clientOrigins) {
+export function createApp(io, corsOrigin) {
   const app = express();
 
   app.use(
     cors({
-      origin: clientOrigins
+      origin: corsOrigin,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      optionsSuccessStatus: 204
     })
   );
   app.use(express.json());

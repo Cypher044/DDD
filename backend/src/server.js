@@ -1,16 +1,23 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { createApp } from "./app.js";
-import { allowedClientOrigins, env } from "./config/env.js";
+import {
+  allowedClientOrigins,
+  createCorsOriginCallback,
+  env
+} from "./config/env.js";
 import { initializeDatabase } from "./db/client.js";
 
 const clientOrigins = allowedClientOrigins();
-const app = createApp(null, clientOrigins);
+console.log("[cors] origines autorisees:", clientOrigins.join(", ") || "(aucune)");
+const corsOrigin = createCorsOriginCallback();
+const app = createApp(null, corsOrigin);
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: clientOrigins,
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   }
 });
 app.set("io", io);
