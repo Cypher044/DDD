@@ -142,6 +142,71 @@ function createMapIcon(color, label) {
   });
 }
 
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function toDegrees(value) {
+  return (value * 180) / Math.PI;
+}
+
+function normalizeBearing(value) {
+  return (value + 360) % 360;
+}
+
+function bearingBetween(from, to) {
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const lngDelta = toRadians(to.lng - from.lng);
+  const y = Math.sin(lngDelta) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lngDelta);
+  return normalizeBearing(toDegrees(Math.atan2(y, x)));
+}
+
+function angularDistance(a, b) {
+  const delta = Math.abs(a - b) % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
+
+function getLineRealtimeStatus(line, buses) {
+  const recentBus = buses
+    .filter((bus) => bus.position)
+    .sort(
+      (a, b) =>
+        new Date(b.position.recordedAt || 0).getTime() - new Date(a.position.recordedAt || 0).getTime()
+    )[0];
+
+  if (!recentBus) {
+    return "Position indisponible";
+  }
+
+  const nearestStop =
+    line.stops.reduce(
+      (best, stop) => {
+        const distance = Math.hypot(recentBus.position.lat - stop.lat, recentBus.position.lng - stop.lng);
+        return !best || distance < best.distance ? { stop, distance } : best;
+      },
+      null
+    )?.stop || line.stops[0];
+
+  const origin = line.stops[0];
+  const terminus = line.stops[line.stops.length - 1];
+  const heading = Number(recentBus.position.heading);
+
+  let directionLabel = "sens inconnu";
+  if (Number.isFinite(heading)) {
+    const toOrigin = bearingBetween(recentBus.position, origin);
+    const toTerminus = bearingBetween(recentBus.position, terminus);
+    directionLabel =
+      angularDistance(normalizeBearing(heading), toOrigin) <
+      angularDistance(normalizeBearing(heading), toTerminus)
+        ? "retour"
+        : "aller";
+  }
+
+  return `Position ${nearestStop.name}, ${directionLabel}`;
+}
+
 /** Nouvelle key quand les coords changent pour que Leaflet affiche le deplacement (react-leaflet + socket). */
 function LiveBusMarker({ bus, line }) {
   if (!bus.position) {
@@ -362,12 +427,14 @@ function LinesPage({ lines, onOpenLine }) {
 }
 
 function LiveMapPage({ line, buses, onOpenLine, onOpenStop }) {
+  const realtimeLabel = getLineRealtimeStatus(line, buses);
+
   return (
     <section className="live-layout">
       <div className="live-toolbar">
         <span className="live-toolbar__icon">🚌</span>
         <button type="button" className="live-toolbar__selector" onClick={() => onOpenLine(line.id)}>
-          {line.code} — {line.title}
+          {line.code} — {line.title} | {realtimeLabel}
         </button>
       </div>
 
@@ -379,6 +446,7 @@ function LiveMapPage({ line, buses, onOpenLine, onOpenStop }) {
           <span className="pill" style={{ background: "#245645", color: "#fff" }}>
             {line.code}
           </span>
+          <small>{realtimeLabel}</small>
           <h2>{line.title}</h2>
           <div className="metric-card">
             <div className="metric-card__icon">🕘</div>
