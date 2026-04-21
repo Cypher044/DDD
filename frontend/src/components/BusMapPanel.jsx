@@ -96,6 +96,22 @@ function getBusRealtimeStatus(bus, line) {
   return `Position exacte: ${exactPosition} (${directionLabel})`;
 }
 
+function extractReadablePlaceName(data) {
+  if (!data) {
+    return null;
+  }
+
+  return (
+    data.locality ||
+    data.city ||
+    data.principalSubdivision ||
+    data.localityInfo?.administrative?.[2]?.name ||
+    data.localityInfo?.administrative?.[1]?.name ||
+    data.countryName ||
+    null
+  );
+}
+
 export default function BusMapPanel({
   buses,
   lines,
@@ -131,9 +147,9 @@ export default function BusMapPanel({
 
       try {
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(
             lat
-          )}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=1`,
+          )}&longitude=${encodeURIComponent(lng)}&localityLanguage=fr`,
           {
             headers: {
               "Accept-Language": "fr"
@@ -146,16 +162,7 @@ export default function BusMapPanel({
         }
 
         const data = await response.json();
-        const address = data?.address || {};
-        const readableName =
-          address.suburb ||
-          address.neighbourhood ||
-          address.city_district ||
-          address.village ||
-          address.town ||
-          address.city ||
-          data?.name ||
-          data?.display_name;
+        const readableName = extractReadablePlaceName(data);
 
         if (!isCancelled && readableName) {
           setPlaceNamesByBus((current) => ({
@@ -216,9 +223,7 @@ export default function BusMapPanel({
                   <br />
                   {line?.name || "Ligne inconnue"}
                   <br />
-                  {readablePlace ? `Position: ${readablePlace}` : "Position: localisation..."}
-                  <br />
-                  Coordonnees: {exactCoords}
+                  {readablePlace ? `Position: ${readablePlace}` : "Position: recherche du lieu..."}
                   <br />
                   {new Date(bus.position.recordedAt).toLocaleString()}
                 </Popup>

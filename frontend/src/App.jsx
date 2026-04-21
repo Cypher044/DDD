@@ -225,6 +225,22 @@ function getBusRealtimeStatus(line, bus) {
   return `Position exacte: ${exactPosition} (${directionLabel})`;
 }
 
+function extractReadablePlaceName(data) {
+  if (!data) {
+    return null;
+  }
+
+  return (
+    data.locality ||
+    data.city ||
+    data.principalSubdivision ||
+    data.localityInfo?.administrative?.[2]?.name ||
+    data.localityInfo?.administrative?.[1]?.name ||
+    data.countryName ||
+    null
+  );
+}
+
 /** Nouvelle key quand les coords changent pour que Leaflet affiche le deplacement (react-leaflet + socket). */
 function LiveBusMarker({ bus, line, placeName }) {
   if (!bus.position) {
@@ -245,9 +261,7 @@ function LiveBusMarker({ bus, line, placeName }) {
         <br />
         {line.title}
         <br />
-        {placeName ? `Position: ${placeName}` : "Position: localisation..."}
-        <br />
-        {getBusRealtimeStatus(line, bus)}
+        {placeName ? `Position: ${placeName}` : "Position: recherche du lieu..."}
       </Popup>
     </Marker>
   );
@@ -333,9 +347,9 @@ function RouteMap({ line, buses, height = 420, compact = false }) {
 
       try {
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(
             lat
-          )}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=1`,
+          )}&longitude=${encodeURIComponent(lng)}&localityLanguage=fr`,
           {
             headers: {
               "Accept-Language": "fr"
@@ -347,16 +361,7 @@ function RouteMap({ line, buses, height = 420, compact = false }) {
         }
 
         const data = await response.json();
-        const address = data?.address || {};
-        const readableName =
-          address.suburb ||
-          address.neighbourhood ||
-          address.city_district ||
-          address.village ||
-          address.town ||
-          address.city ||
-          data?.name ||
-          data?.display_name;
+        const readableName = extractReadablePlaceName(data);
 
         if (!isCancelled && readableName) {
           setPlaceNamesByBus((current) => ({
