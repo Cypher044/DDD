@@ -180,14 +180,7 @@ function getLineRealtimeStatus(line, buses) {
     return "Position indisponible";
   }
 
-  const nearestStop =
-    line.stops.reduce(
-      (best, stop) => {
-        const distance = Math.hypot(recentBus.position.lat - stop.lat, recentBus.position.lng - stop.lng);
-        return !best || distance < best.distance ? { stop, distance } : best;
-      },
-      null
-    )?.stop || line.stops[0];
+  const exactPosition = `${recentBus.position.lat.toFixed(6)}, ${recentBus.position.lng.toFixed(6)}`;
 
   const origin = line.stops[0];
   const terminus = line.stops[line.stops.length - 1];
@@ -204,7 +197,7 @@ function getLineRealtimeStatus(line, buses) {
         : "aller";
   }
 
-  return `Position ${nearestStop.name}, ${directionLabel}`;
+  return `Position exacte: ${exactPosition} (${directionLabel})`;
 }
 
 function getBusRealtimeStatus(line, bus) {
@@ -212,14 +205,7 @@ function getBusRealtimeStatus(line, bus) {
     return "Position indisponible";
   }
 
-  const nearestStop =
-    line.stops.reduce(
-      (best, stop) => {
-        const distance = Math.hypot(bus.position.lat - stop.lat, bus.position.lng - stop.lng);
-        return !best || distance < best.distance ? { stop, distance } : best;
-      },
-      null
-    )?.stop || line.stops[0];
+  const exactPosition = `${bus.position.lat.toFixed(6)}, ${bus.position.lng.toFixed(6)}`;
 
   const origin = line.stops[0];
   const terminus = line.stops[line.stops.length - 1];
@@ -236,7 +222,7 @@ function getBusRealtimeStatus(line, bus) {
         : "aller";
   }
 
-  return `Position ${nearestStop.name}, ${directionLabel}`;
+  return `Position exacte: ${exactPosition} (${directionLabel})`;
 }
 
 /** Nouvelle key quand les coords changent pour que Leaflet affiche le deplacement (react-leaflet + socket). */
