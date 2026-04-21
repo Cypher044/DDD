@@ -226,7 +226,7 @@ function getBusRealtimeStatus(line, bus) {
 }
 
 /** Nouvelle key quand les coords changent pour que Leaflet affiche le deplacement (react-leaflet + socket). */
-function LiveBusMarker({ bus, line }) {
+function LiveBusMarker({ bus, line, placeName }) {
   if (!bus.position) {
     return null;
   }
@@ -244,6 +244,8 @@ function LiveBusMarker({ bus, line }) {
         <strong>{bus.label}</strong>
         <br />
         {line.title}
+        <br />
+        {placeName ? `Position: ${placeName}` : "Position: localisation..."}
         <br />
         {getBusRealtimeStatus(line, bus)}
       </Popup>
@@ -310,6 +312,71 @@ function RouteMap({ line, buses, height = 420, compact = false }) {
   const positions = line.stops.map((stop) => [stop.lat, stop.lng]);
   const centeredBuses = buses.filter((bus) => bus.position);
   const mapClassName = compact ? "route-map route-map--compact" : "route-map";
+  const [placeNamesByBus, setPlaceNamesByBus] = useState({});
+  const fetchedCoordKeysRef = useRef(new Set());
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function resolvePlaceName(bus) {
+      const lat = bus.position?.lat;
+      const lng = bus.position?.lng;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+      }
+
+      const coordKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+      if (fetchedCoordKeysRef.current.has(coordKey)) {
+        return;
+      }
+      fetchedCoordKeysRef.current.add(coordKey);
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+            lat
+          )}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=1`,
+          {
+            headers: {
+              "Accept-Language": "fr"
+            }
+          }
+        );
+        if (!response.ok) {
+          throw new Error("reverse-geocode-failed");
+        }
+
+        const data = await response.json();
+        const address = data?.address || {};
+        const readableName =
+          address.suburb ||
+          address.neighbourhood ||
+          address.city_district ||
+          address.village ||
+          address.town ||
+          address.city ||
+          data?.name ||
+          data?.display_name;
+
+        if (!isCancelled && readableName) {
+          setPlaceNamesByBus((current) => ({
+            ...current,
+            [bus.id]: readableName
+          }));
+        }
+      } catch {
+        // Keep coordinates-only fallback in popup.
+      }
+    }
+
+    centeredBuses.forEach((bus) => {
+      resolvePlaceName(bus);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [centeredBuses]);
 
   return (
     <MapContainer center={positions[0]} zoom={12} scrollWheelZoom className={mapClassName} style={{ height }}>
@@ -329,7 +396,7 @@ function RouteMap({ line, buses, height = 420, compact = false }) {
         </CircleMarker>
       ))}
       {centeredBuses.map((bus) => (
-        <LiveBusMarker key={bus.id} bus={bus} line={line} />
+        <LiveBusMarker key={bus.id} bus={bus} line={line} placeName={placeNamesByBus[bus.id]} />
       ))}
     </MapContainer>
   );
