@@ -68,18 +68,15 @@ function angularDistance(a, b) {
 }
 
 function getBusRealtimeStatus(bus, line) {
-  if (!bus?.position || !line?.stops?.length) {
+  if (!bus?.position) {
     return "Position indisponible";
   }
 
-  const nearestStop =
-    line.stops.reduce(
-      (best, stop) => {
-        const distance = Math.hypot(bus.position.lat - stop.lat, bus.position.lng - stop.lng);
-        return !best || distance < best.distance ? { stop, distance } : best;
-      },
-      null
-    )?.stop || line.stops[0];
+  const exactPosition = `${bus.position.lat.toFixed(6)}, ${bus.position.lng.toFixed(6)}`;
+
+  if (!line?.stops?.length) {
+    return `Position exacte: ${exactPosition}`;
+  }
 
   const origin = line.stops[0];
   const terminus = line.stops[line.stops.length - 1];
@@ -96,7 +93,7 @@ function getBusRealtimeStatus(bus, line) {
         : "aller";
   }
 
-  return `Position ${nearestStop.name}, ${directionLabel}`;
+  return `Position exacte: ${exactPosition} (${directionLabel})`;
 }
 
 export default function BusMapPanel({
@@ -180,6 +177,11 @@ export default function BusMapPanel({
                       {bus.position?.recordedAt
                         ? `Maj: ${new Date(bus.position.recordedAt).toLocaleTimeString()}`
                         : "Aucune position recente"}
+                    </small>
+                    <small>
+                      {bus.position
+                        ? `Coordonnees: ${bus.position.lat.toFixed(6)}, ${bus.position.lng.toFixed(6)}`
+                        : "Coordonnees indisponibles"}
                     </small>
                   </div>
                 </article>
