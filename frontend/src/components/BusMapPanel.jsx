@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { divIcon } from "leaflet";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 
@@ -102,12 +102,80 @@ export default function BusMapPanel({
   title = "Carte MVP",
   subtitle = "Vue live sur Dakar"
 }) {
+  const [placeNamesByBus, setPlaceNamesByBus] = useState({});
+  const fetchedCoordKeysRef = useRef(new Set());
   const positionedBuses = buses.filter(
     (bus) =>
       bus.position &&
       Number.isFinite(bus.position.lat) &&
       Number.isFinite(bus.position.lng)
   );
+  const lineById = useMemo(
+    () => Object.fromEntries(lines.map((line) => [line.id, line])),
+    [lines]
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function resolvePlaceName(bus) {
+      const lat = bus.position.lat;
+      const lng = bus.position.lng;
+      const coordKey = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+      if (fetchedCoordKeysRef.current.has(coordKey)) {
+        return;
+      }
+
+      fetchedCoordKeysRef.current.add(coordKey);
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+            lat
+          )}&lon=${encodeURIComponent(lng)}&zoom=17&addressdetails=1`,
+          {
+            headers: {
+              "Accept-Language": "fr"
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("reverse-geocode-failed");
+        }
+
+        const data = await response.json();
+        const address = data?.address || {};
+        const readableName =
+          address.suburb ||
+          address.neighbourhood ||
+          address.city_district ||
+          address.village ||
+          address.town ||
+          address.city ||
+          data?.name ||
+          data?.display_name;
+
+        if (!isCancelled && readableName) {
+          setPlaceNamesByBus((current) => ({
+            ...current,
+            [bus.id]: readableName
+          }));
+        }
+      } catch {
+        // Keep coordinates-only display if reverse geocoding fails.
+      }
+    }
+
+    positionedBuses.forEach((bus) => {
+      resolvePlaceName(bus);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [positionedBuses]);
 
   return (
     <section className="panel panel-map">
@@ -133,7 +201,9 @@ export default function BusMapPanel({
           />
           <MapViewport buses={positionedBuses} />
           {positionedBuses.map((bus) => {
-            const line = lines.find((item) => item.id === bus.lineId);
+            const line = lineById[bus.lineId];
+            const exactCoords = `${bus.position.lat.toFixed(6)}, ${bus.position.lng.toFixed(6)}`;
+            const readablePlace = placeNamesByBus[bus.id];
 
             return (
               <Marker
@@ -146,7 +216,9 @@ export default function BusMapPanel({
                   <br />
                   {line?.name || "Ligne inconnue"}
                   <br />
-                  {getBusRealtimeStatus(bus, line)}
+                  {readablePlace ? `Position: ${readablePlace}` : "Position: localisation..."}
+                  <br />
+                  Coordonnees: {exactCoords}
                   <br />
                   {new Date(bus.position.recordedAt).toLocaleString()}
                 </Popup>
@@ -162,7 +234,8 @@ export default function BusMapPanel({
           </div>
           <div className="map-legend__list">
             {buses.map((bus) => {
-              const line = lines.find((item) => item.id === bus.lineId);
+              const line = lineById[bus.lineId];
+              const readablePlace = placeNamesByBus[bus.id];
 
               return (
                 <article className="legend-card" key={bus.id}>
@@ -177,6 +250,9 @@ export default function BusMapPanel({
                       {bus.position?.recordedAt
                         ? `Maj: ${new Date(bus.position.recordedAt).toLocaleTimeString()}`
                         : "Aucune position recente"}
+                    </small>
+                    <small>
+                      {bus.position ? `Position: ${readablePlace || "localisation..."}` : "Position indisponible"}
                     </small>
                     <small>
                       {bus.position
