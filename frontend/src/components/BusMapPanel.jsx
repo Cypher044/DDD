@@ -41,6 +41,64 @@ function createBusIcon(color, label) {
   });
 }
 
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function toDegrees(value) {
+  return (value * 180) / Math.PI;
+}
+
+function normalizeBearing(value) {
+  return (value + 360) % 360;
+}
+
+function bearingBetween(from, to) {
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const lngDelta = toRadians(to.lng - from.lng);
+  const y = Math.sin(lngDelta) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lngDelta);
+  return normalizeBearing(toDegrees(Math.atan2(y, x)));
+}
+
+function angularDistance(a, b) {
+  const delta = Math.abs(a - b) % 360;
+  return delta > 180 ? 360 - delta : delta;
+}
+
+function getBusRealtimeStatus(bus, line) {
+  if (!bus?.position || !line?.stops?.length) {
+    return "Position indisponible";
+  }
+
+  const nearestStop =
+    line.stops.reduce(
+      (best, stop) => {
+        const distance = Math.hypot(bus.position.lat - stop.lat, bus.position.lng - stop.lng);
+        return !best || distance < best.distance ? { stop, distance } : best;
+      },
+      null
+    )?.stop || line.stops[0];
+
+  const origin = line.stops[0];
+  const terminus = line.stops[line.stops.length - 1];
+  const heading = Number(bus.position.heading);
+
+  let directionLabel = "sens inconnu";
+  if (Number.isFinite(heading)) {
+    const toOrigin = bearingBetween(bus.position, origin);
+    const toTerminus = bearingBetween(bus.position, terminus);
+    directionLabel =
+      angularDistance(normalizeBearing(heading), toOrigin) <
+      angularDistance(normalizeBearing(heading), toTerminus)
+        ? "retour"
+        : "aller";
+  }
+
+  return `Position ${nearestStop.name}, ${directionLabel}`;
+}
+
 export default function BusMapPanel({
   buses,
   lines,
@@ -90,6 +148,8 @@ export default function BusMapPanel({
                   <strong>{bus.label}</strong>
                   <br />
                   {line?.name || "Ligne inconnue"}
+                  <br />
+                  {getBusRealtimeStatus(bus, line)}
                   <br />
                   {new Date(bus.position.recordedAt).toLocaleString()}
                 </Popup>
