@@ -6,7 +6,8 @@ import {
   Marker,
   Polyline,
   Popup,
-  TileLayer
+  TileLayer,
+  useMap
 } from "react-leaflet";
 import AdminPanel from "./components/AdminPanel";
 import DriverPanel from "./components/DriverPanel";
@@ -267,6 +268,23 @@ function LiveBusMarker({ bus, line, placeName }) {
   );
 }
 
+function RouteMapResize({ resizeKey }) {
+  const map = useMap();
+
+  useEffect(() => {
+    // Leaflet needs explicit resize when container height changes dynamically.
+    const timeoutId = window.setTimeout(() => {
+      map.invalidateSize();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [map, resizeKey]);
+
+  return null;
+}
+
 function Header({ siteMode, onModeChange, onNavigate, publicPage }) {
   const publicLinks = [
     ["home", "Accueil"],
@@ -385,6 +403,7 @@ function RouteMap({ line, buses, height = 420, compact = false }) {
 
   return (
     <MapContainer center={positions[0]} zoom={12} scrollWheelZoom className={mapClassName} style={{ height }}>
+      <RouteMapResize resizeKey={`${compact}-${height}`} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -593,7 +612,13 @@ function LineDetailPage({ line, buses, onOpenLive }) {
               Grande map
             </button>
           </div>
-          <RouteMap line={line} buses={buses} compact={isMiniMap} height={isMiniMap ? 320 : 520} />
+          <RouteMap
+            key={mapMode}
+            line={line}
+            buses={buses}
+            compact={isMiniMap}
+            height={isMiniMap ? 320 : 620}
+          />
           <div className="line-detail-meta">
             <div className="line-detail-meta__card">
               <strong>Frequence</strong>
