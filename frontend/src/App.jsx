@@ -565,6 +565,9 @@ function LiveMapPage({ line, buses, onOpenLine, onOpenStop }) {
 }
 
 function LineDetailPage({ line, buses, onOpenLive }) {
+  const [mapMode, setMapMode] = useState("mini");
+  const isMiniMap = mapMode === "mini";
+
   return (
     <section className="line-detail-layout">
       <div className="line-detail-main">
@@ -575,12 +578,22 @@ function LineDetailPage({ line, buses, onOpenLive }) {
 
         <article className="line-detail-card">
           <div className="line-detail-tabs">
-            <button type="button" className="active">
+            <button
+              type="button"
+              className={isMiniMap ? "active" : ""}
+              onClick={() => setMapMode("mini")}
+            >
               Mini map
             </button>
-            <button type="button">Dini map</button>
+            <button
+              type="button"
+              className={!isMiniMap ? "active" : ""}
+              onClick={() => setMapMode("full")}
+            >
+              Grande map
+            </button>
           </div>
-          <RouteMap line={line} buses={buses} compact height={320} />
+          <RouteMap line={line} buses={buses} compact={isMiniMap} height={isMiniMap ? 320 : 520} />
           <div className="line-detail-meta">
             <div className="line-detail-meta__card">
               <strong>Frequence</strong>
