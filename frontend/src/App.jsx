@@ -207,6 +207,38 @@ function getLineRealtimeStatus(line, buses) {
   return `Position ${nearestStop.name}, ${directionLabel}`;
 }
 
+function getBusRealtimeStatus(line, bus) {
+  if (!bus?.position) {
+    return "Position indisponible";
+  }
+
+  const nearestStop =
+    line.stops.reduce(
+      (best, stop) => {
+        const distance = Math.hypot(bus.position.lat - stop.lat, bus.position.lng - stop.lng);
+        return !best || distance < best.distance ? { stop, distance } : best;
+      },
+      null
+    )?.stop || line.stops[0];
+
+  const origin = line.stops[0];
+  const terminus = line.stops[line.stops.length - 1];
+  const heading = Number(bus.position.heading);
+
+  let directionLabel = "sens inconnu";
+  if (Number.isFinite(heading)) {
+    const toOrigin = bearingBetween(bus.position, origin);
+    const toTerminus = bearingBetween(bus.position, terminus);
+    directionLabel =
+      angularDistance(normalizeBearing(heading), toOrigin) <
+      angularDistance(normalizeBearing(heading), toTerminus)
+        ? "retour"
+        : "aller";
+  }
+
+  return `Position ${nearestStop.name}, ${directionLabel}`;
+}
+
 /** Nouvelle key quand les coords changent pour que Leaflet affiche le deplacement (react-leaflet + socket). */
 function LiveBusMarker({ bus, line }) {
   if (!bus.position) {
@@ -226,6 +258,8 @@ function LiveBusMarker({ bus, line }) {
         <strong>{bus.label}</strong>
         <br />
         {line.title}
+        <br />
+        {getBusRealtimeStatus(line, bus)}
       </Popup>
     </Marker>
   );
